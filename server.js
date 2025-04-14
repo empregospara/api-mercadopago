@@ -5,7 +5,12 @@ const cors = require("cors");
 const fs = require("fs");
 
 const app = express();
-app.use(cors());
+
+// CORS ajustado para permitir frontend na Vercel
+app.use(cors({
+  origin: "https://curriculospara.vercel.app"
+}));
+
 app.use(express.json());
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
