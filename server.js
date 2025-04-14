@@ -31,7 +31,7 @@ app.use((req, res, next) => {
 app.post("/criar-preferencia", (req, res) => {
   try {
     const amount = 3.00; // valor fixo do currículo
-    const email = "teste@teste.com"; // email genérico obrigatório (ou use aleatório se quiser)
+    const email = "daniel_geovani@live.com"; // email genérico obrigatório (ou use aleatório se quiser)
 
     res.json({ amount, email });
   } catch (err) {
