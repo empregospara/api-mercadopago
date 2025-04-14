@@ -37,8 +37,13 @@ app.post("/criar-preferencia", async (req, res) => {
       purpose: "wallet_purchase",
       payment_methods: {
         default_payment_method_id: "pix",
-        excluded_payment_types: [],
-        installments: 1
+        excluded_payment_types: [
+          { id: "credit_card" },
+          { id: "debit_card" },
+          { id: "ticket" },
+          { id: "atm" },
+          { id: "bank_transfer" }
+        ]
       },
       back_urls: {
         success: "https://curriculospara.vercel.app/success",
