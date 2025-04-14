@@ -9,22 +9,31 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Middleware de log para depuração
-app.use((req, res, next) => {
-  console.log(`Requisição recebida para ${req.url}`);
-  next();
-});
-
-// Carregando variáveis de ambiente
+// Validação inicial das variáveis de ambiente
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const MP_NOTIFICATION_URL = process.env.MP_NOTIFICATION_URL;
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
 const PORT = process.env.PORT || 10000;
 
+if (!MP_ACCESS_TOKEN || !MP_NOTIFICATION_URL) {
+  console.error("❌ Variáveis obrigatórias ausentes: MP_ACCESS_TOKEN ou MP_NOTIFICATION_URL");
+  process.exit(1);
+}
+
+// Middleware de log para depuração
+app.use((req, res, next) => {
+  console.log(`📥 Requisição recebida: [${req.method}] ${req.url}`);
+  next();
+});
+
 // Criar pagamento Pix
 app.post("/criar-pagamento", async (req, res) => {
   try {
-    const { email = "daniel_geovani@gmail.com", nome = "Nome Teste", cpf = "01810422230" } = req.body;
+    const {
+      email = "daniel_geovani@gmail.com",
+      nome = "Nome Teste",
+      cpf = "01810422230"
+    } = req.body;
 
     const pagamento = {
       transaction_amount: 1.0,
@@ -52,6 +61,16 @@ app.post("/criar-pagamento", async (req, res) => {
     );
 
     const { id, point_of_interaction } = response.data;
+
+    if (
+      !point_of_interaction ||
+      !point_of_interaction.transaction_data ||
+      !point_of_interaction.transaction_data.qr_code
+    ) {
+      console.error("❌ Dados de transação ausentes:", response.data);
+      return res.status(500).json({ erro: "Falha ao gerar QR Code do pagamento" });
+    }
+
     const { qr_code_base64, qr_code } = point_of_interaction.transaction_data;
 
     res.json({ id, qr_code_base64, qr_code });
@@ -93,14 +112,14 @@ app.post("/check-payment", async (req, res) => {
   }
 });
 
-// Middleware para rotas não encontradas
+// Rota fallback
 app.use((req, res) => {
   res.status(404).json({ error: "Rota não encontrada" });
 });
 
-// Inicia o servidor
+// Inicialização
 app.listen(PORT, () => {
   console.log(`✅ API Mercado Pago rodando na porta ${PORT}`);
-  console.log("MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
-  console.log("MP_WEBHOOK_SECRET:", MP_WEBHOOK_SECRET);
+  console.log("🔐 MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
+  console.log("🔐 MP_WEBHOOK_SECRET:", MP_WEBHOOK_SECRET);
 });
