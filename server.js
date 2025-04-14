@@ -67,8 +67,9 @@ app.post("/criar-preferencia", async (req, res) => {
 
     res.json({ preferenceId: response.data.id });
   } catch (err) {
-    console.error("❌ Erro ao criar preferência:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao criar preferência" });
+    const erro = err.response?.data || err.message;
+    console.error("❌ Erro ao criar preferência:", JSON.stringify(erro, null, 2));
+    res.status(500).json({ erro: "Erro ao criar preferência", detalhes: erro });
   }
 });
 
@@ -99,8 +100,9 @@ app.post("/check-payment", async (req, res) => {
     const pago = response.data.status === "approved";
     res.json({ paid: pago });
   } catch (err) {
-    console.error("❌ Erro ao verificar pagamento:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao verificar pagamento" });
+    const erro = err.response?.data || err.message;
+    console.error("❌ Erro ao verificar pagamento:", JSON.stringify(erro, null, 2));
+    res.status(500).json({ erro: "Erro ao verificar pagamento", detalhes: erro });
   }
 });
 
