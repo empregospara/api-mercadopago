@@ -6,7 +6,6 @@ const fs = require("fs");
 
 const app = express();
 
-// CORS ajustado para permitir frontend na Vercel
 app.use(cors({
   origin: "https://curriculospara.vercel.app"
 }));
@@ -28,51 +27,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Criar preferência para o Payment Brick (Pix)
-app.post("/criar-preferencia", async (req, res) => {
+// Criar dados de pagamento para Payment Brick (Checkout Transparente)
+app.post("/criar-preferencia", (req, res) => {
   try {
-    const preference = {
-      items: [
-        {
-          title: "Pagamento Currículo",
-          unit_price: 1.0,
-          quantity: 1
-        }
-      ],
-      purpose: "wallet_purchase",
-      payment_methods: {
-        excluded_payment_types: [
-          { id: "credit_card" },
-          { id: "debit_card" },
-          { id: "ticket" },
-          { id: "atm" },
-          { id: "bank_transfer" }
-        ]
-      },
-      back_urls: {
-        success: "https://curriculospara.vercel.app/success",
-        pending: "https://curriculospara.vercel.app/pending",
-        failure: "https://curriculospara.vercel.app/failure"
-      },
-      auto_return: "approved",
-      notification_url: `${MP_NOTIFICATION_URL}/webhook`
-    };
+    const amount = 3.00; // valor fixo do currículo
+    const email = "teste@teste.com"; // email genérico obrigatório (ou use aleatório se quiser)
 
-    const response = await axios.post(
-      "https://api.mercadopago.com/checkout/preferences",
-      preference,
-      {
-        headers: {
-          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    res.json({ preferenceId: response.data.id });
+    res.json({ amount, email });
   } catch (err) {
-    console.error("❌ Erro ao criar preferência:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao criar preferência" });
+    console.error("❌ Erro ao retornar dados para o Payment Brick:", err.message);
+    res.status(500).json({ erro: "Erro ao gerar dados de pagamento" });
   }
 });
 
