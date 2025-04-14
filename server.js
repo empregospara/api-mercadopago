@@ -21,8 +21,11 @@ app.post("/criar-preferencia", async (req, res) => {
           quantity: 1
         }
       ],
+      payer: {
+        email: "daniel_geovani@live.com" // Substitua pelo e-mail de teste real
+      },
       purpose: "wallet_purchase",
-      notification_url: "https:///webhook" // Substituir pelo seu domínio real
+      notification_url: "https://api-mercadopago-nqye.onrender.com/webhook"
     };
 
     const response = await axios.post(
