@@ -8,7 +8,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Validação inicial das variáveis de ambiente
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const MP_NOTIFICATION_URL = process.env.MP_NOTIFICATION_URL;
 const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
@@ -19,13 +18,12 @@ if (!MP_ACCESS_TOKEN || !MP_NOTIFICATION_URL) {
   process.exit(1);
 }
 
-// Middleware de log para depuração
 app.use((req, res, next) => {
   console.log(`📥 Requisição recebida: [${req.method}] ${req.url}`);
   next();
 });
 
-// Criar preferência para Payment Brick com Pix
+// Criar preferência para o Payment Brick (Pix)
 app.post("/criar-preferencia", async (req, res) => {
   try {
     const preference = {
@@ -41,6 +39,11 @@ app.post("/criar-preferencia", async (req, res) => {
         default_payment_method_id: "pix",
         excluded_payment_types: [],
         installments: 1
+      },
+      back_urls: {
+        success: "https://curriculospara.vercel.app/success",
+        pending: "https://curriculospara.vercel.app/pending",
+        failure: "https://curriculospara.vercel.app/failure"
       },
       auto_return: "approved",
       notification_url: `${MP_NOTIFICATION_URL}/webhook`
@@ -96,12 +99,11 @@ app.post("/check-payment", async (req, res) => {
   }
 });
 
-// Rota fallback
+// Fallback
 app.use((req, res) => {
   res.status(404).json({ error: "Rota não encontrada" });
 });
 
-// Inicialização
 app.listen(PORT, () => {
   console.log(`✅ API Mercado Pago rodando na porta ${PORT}`);
   console.log("🔐 MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
