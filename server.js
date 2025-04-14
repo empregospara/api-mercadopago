@@ -64,10 +64,9 @@ app.post("/criar-preferencia", async (req, res) => {
       }
     );
 
-    console.log("✅ Preferência criada com sucesso:", response.data.id);
     res.json({ preferenceId: response.data.id });
   } catch (err) {
-    console.error("❌ Erro ao criar preferência:", JSON.stringify(err.response?.data || err.message, null, 2));
+    console.error("❌ Erro ao criar preferência:", err.response?.data || err.message);
     res.status(500).json({ erro: "Erro ao criar preferência" });
   }
 });
@@ -99,11 +98,12 @@ app.post("/check-payment", async (req, res) => {
     const pago = response.data.status === "approved";
     res.json({ paid: pago });
   } catch (err) {
-    console.error("❌ Erro ao verificar pagamento:", JSON.stringify(err.response?.data || err.message, null, 2));
+    console.error("❌ Erro ao verificar pagamento:", err.response?.data || err.message);
     res.status(500).json({ erro: "Erro ao verificar pagamento" });
   }
 });
 
+// Fallback
 app.use((req, res) => {
   res.status(404).json({ error: "Rota não encontrada" });
 });
