@@ -3,7 +3,6 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const fs = require("fs");
-const crypto = require("crypto");
 
 const app = express();
 app.use(cors());
@@ -26,57 +25,42 @@ app.use((req, res, next) => {
   next();
 });
 
-// Criar pagamento Pix
-app.post("/criar-pagamento", async (req, res) => {
+// Criar preferência para Payment Brick com Pix
+app.post("/criar-preferencia", async (req, res) => {
   try {
-    const {
-      email = "daniel_geovani@gmail.com",
-      nome = "Nome Teste",
-      cpf = "01810422230"
-    } = req.body;
-
-    const pagamento = {
-      transaction_amount: 1.0,
-      payment_method_id: "pix",
-      description: "Pagamento Currículo",
-      payer: {
-        email,
-        first_name: nome,
-        last_name: "Empregos",
-        identification: { type: "CPF", number: cpf }
+    const preference = {
+      items: [
+        {
+          title: "Pagamento Currículo",
+          unit_price: 1.0,
+          quantity: 1
+        }
+      ],
+      purpose: "wallet_purchase",
+      payment_methods: {
+        default_payment_method_id: "pix",
+        excluded_payment_types: [],
+        installments: 1
       },
+      auto_return: "approved",
       notification_url: `${MP_NOTIFICATION_URL}/webhook`
     };
 
     const response = await axios.post(
-      "https://api.mercadopago.com/v1/payments",
-      pagamento,
+      "https://api.mercadopago.com/checkout/preferences",
+      preference,
       {
         headers: {
           Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-          "X-Idempotency-Key": crypto.randomBytes(16).toString("hex")
+          "Content-Type": "application/json"
         }
       }
     );
 
-    const { id, point_of_interaction } = response.data;
-
-    if (
-      !point_of_interaction ||
-      !point_of_interaction.transaction_data ||
-      !point_of_interaction.transaction_data.qr_code
-    ) {
-      console.error("❌ Dados de transação ausentes:", response.data);
-      return res.status(500).json({ erro: "Falha ao gerar QR Code do pagamento" });
-    }
-
-    const { qr_code_base64, qr_code } = point_of_interaction.transaction_data;
-
-    res.json({ id, qr_code_base64, qr_code });
+    res.json({ preferenceId: response.data.id });
   } catch (err) {
-    console.error("❌ Erro ao criar pagamento Pix:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao criar pagamento Pix" });
+    console.error("❌ Erro ao criar preferência:", err.response?.data || err.message);
+    res.status(500).json({ erro: "Erro ao criar preferência" });
   }
 });
 
