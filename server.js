@@ -36,7 +36,6 @@ app.post("/criar-preferencia", async (req, res) => {
       ],
       purpose: "wallet_purchase",
       payment_methods: {
-        default_payment_method_id: "pix",
         excluded_payment_types: [
           { id: "credit_card" },
           { id: "debit_card" },
@@ -65,11 +64,11 @@ app.post("/criar-preferencia", async (req, res) => {
       }
     );
 
+    console.log("✅ Preferência criada com sucesso:", response.data.id);
     res.json({ preferenceId: response.data.id });
   } catch (err) {
-    const erro = err.response?.data || err.message;
-    console.error("❌ Erro ao criar preferência:", JSON.stringify(erro, null, 2));
-    res.status(500).json({ erro: "Erro ao criar preferência", detalhes: erro });
+    console.error("❌ Erro ao criar preferência:", JSON.stringify(err.response?.data || err.message, null, 2));
+    res.status(500).json({ erro: "Erro ao criar preferência" });
   }
 });
 
@@ -100,13 +99,11 @@ app.post("/check-payment", async (req, res) => {
     const pago = response.data.status === "approved";
     res.json({ paid: pago });
   } catch (err) {
-    const erro = err.response?.data || err.message;
-    console.error("❌ Erro ao verificar pagamento:", JSON.stringify(erro, null, 2));
-    res.status(500).json({ erro: "Erro ao verificar pagamento", detalhes: erro });
+    console.error("❌ Erro ao verificar pagamento:", JSON.stringify(err.response?.data || err.message, null, 2));
+    res.status(500).json({ erro: "Erro ao verificar pagamento" });
   }
 });
 
-// Fallback
 app.use((req, res) => {
   res.status(404).json({ error: "Rota não encontrada" });
 });
