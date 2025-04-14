@@ -3,55 +3,62 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const fs = require("fs");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // =========================
-// Criar preferência para o Payment Brick (Pix)
+// Criar pagamento Pix direto (Checkout Transparente)
 // =========================
-app.post("/criar-preferencia", async (req, res) => {
+app.post("/criar-pagamento", async (req, res) => {
   try {
-    const preference = {
-      items: [
-        {
-          title: "Pagamento Currículo",
-          unit_price: 0.01,
-          quantity: 1
+    const { email = "usuario@teste.com", nome = "Nome Teste", cpf = "12345678909" } = req.body;
+
+    const pagamento = {
+      transaction_amount: 1.0,
+      payment_method_id: "pix",
+      description: "Pagamento Currículo",
+      payer: {
+        email,
+        first_name: nome,
+        last_name: "Empregos",
+        identification: {
+          type: "CPF",
+          number: cpf
         }
-      ],
-      purpose: "wallet_purchase",
-      payment_methods: {
-        excluded_payment_methods: [],
-        excluded_payment_types: [],
-        default_payment_method_id: "pix",
-        installments: 1
       },
-      auto_return: "approved",
       notification_url: `${process.env.WEBHOOK_URL}/webhook`
     };
 
     const response = await axios.post(
-      "https://api.mercadopago.com/checkout/preferences",
-      preference,
+      "https://api.mercadopago.com/v1/payments",
+      pagamento,
       {
         headers: {
           Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": uuidv4()
         }
       }
     );
 
-    res.json({ preferenceId: response.data.id });
+    const { id, point_of_interaction } = response.data;
+
+    res.json({
+      id,
+      qr_code_base64: point_of_interaction.transaction_data.qr_code_base64,
+      qr_code: point_of_interaction.transaction_data.qr_code
+    });
   } catch (err) {
-    console.error("❌ Erro ao criar preferência:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao criar preferência" });
+    console.error("❌ Erro ao criar pagamento Pix:", err.response?.data || err.message);
+    res.status(500).json({ erro: "Erro ao criar pagamento Pix" });
   }
 });
 
 // =========================
-// Webhook de notificação (Pix aprovado, etc.)
+// Webhook (notificação de pagamento Pix)
 // =========================
 app.post("/webhook", (req, res) => {
   try {
@@ -67,7 +74,7 @@ app.post("/webhook", (req, res) => {
 });
 
 // =========================
-// Fallback opcional de verificação de pagamento
+// Verificar status do pagamento
 // =========================
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
