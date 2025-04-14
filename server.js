@@ -8,9 +8,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// =========================
-// Criar preferência para o Payment Brick (Pix)
-// =========================
 app.post("/criar-preferencia", async (req, res) => {
   try {
     const preference = {
@@ -18,14 +15,11 @@ app.post("/criar-preferencia", async (req, res) => {
         {
           title: "Pagamento Currículo",
           unit_price: 0.01,
-          quantity: 1
-        }
+          quantity: 1,
+        },
       ],
-      payer: {
-        email: "daniel_geovani@live.com" // Substitua pelo e-mail de teste real
-      },
       purpose: "wallet_purchase",
-      notification_url: "https://api-mercadopago-nqye.onrender.com/webhook"
+      notification_url: "https://api-mercadopago-nqye.onrender.com/webhook",
     };
 
     const response = await axios.post(
@@ -34,8 +28,8 @@ app.post("/criar-preferencia", async (req, res) => {
       {
         headers: {
           Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
 
@@ -46,9 +40,6 @@ app.post("/criar-preferencia", async (req, res) => {
   }
 });
 
-// =========================
-// Webhook de notificação (Pix aprovado, etc.)
-// =========================
 app.post("/webhook", (req, res) => {
   try {
     const log = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
@@ -62,9 +53,6 @@ app.post("/webhook", (req, res) => {
   }
 });
 
-// =========================
-// Fallback opcional de verificação de pagamento
-// =========================
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ erro: "id do pagamento não informado" });
@@ -74,8 +62,8 @@ app.post("/check-payment", async (req, res) => {
       `https://api.mercadopago.com/v1/payments/${id}`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        },
       }
     );
 
