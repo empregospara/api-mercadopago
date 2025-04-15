@@ -1,8 +1,8 @@
 require("dotenv").config();
 const express = require("express");
-const axios = require("axios");
 const cors = require("cors");
 const fs = require("fs");
+const { MercadoPagoConfig, Payment } = require("mercadopago");
 
 const app = express();
 app.use(cors());
@@ -10,140 +10,106 @@ app.use(express.json());
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 const MP_NOTIFICATION_URL = process.env.MP_NOTIFICATION_URL;
-const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET;
 const PORT = process.env.PORT || 10000;
 
 if (!MP_ACCESS_TOKEN || !MP_NOTIFICATION_URL) {
-  console.error("❌ Variáveis obrigatórias ausentes: MP_ACCESS_TOKEN ou MP_NOTIFICATION_URL");
+  console.error("❌ MP_ACCESS_TOKEN ou MP_NOTIFICATION_URL não definidos no .env");
   process.exit(1);
 }
 
-// LOG GERAL DE INICIALIZAÇÃO
+const mpClient = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
+const payment = new Payment(mpClient);
+
+// LOG INICIAL
 console.log("===========================");
-console.log("✅ Inicializando API Mercado Pago");
+console.log("✅ Inicializando API Mercado Pago com Payment Brick");
 console.log("🔐 MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
-console.log("🔐 MP_WEBHOOK_SECRET:", MP_WEBHOOK_SECRET ? "Definido" : "Não definido");
 console.log("===========================");
 
-// LOG DE TODAS AS REQUISIÇÕES RECEBIDAS
+// LOG GLOBAL DE TODAS AS REQUISIÇÕES
 app.use((req, res, next) => {
-  console.log(`📥 Requisição recebida: [${req.method}] ${req.url}`);
+  console.log(`📥 [${req.method}] ${req.url}`);
   next();
 });
 
-// CRIAÇÃO DE PREFERÊNCIA PARA USO NO PAYMENT BRICK
-app.post("/criar-preferencia", async (req, res) => {
+// ROTA DE CRIAÇÃO DE PAGAMENTO PARA O PAYMENT BRICK
+app.post("/criar-pagamento", async (req, res) => {
   try {
-    console.log("🚀 [criar-preferencia] Iniciando criação de preferência");
-    const preference = {
-      items: [
-        {
-          title: "Pagamento Currículo",
-          unit_price: 2.0, // Ajustado para R$2,00 para evitar erro de valor mínimo
-          quantity: 1,
+    const { email, nome = "Usuário", cpf } = req.body;
+
+    const body = {
+      transaction_amount: 2.0,
+      description: "Pagamento de Currículo",
+      payment_method_id: "pix",
+      payer: {
+        email: email || "usuario@teste.com",
+        first_name: nome,
+        last_name: "Empregos",
+        identification: {
+          type: "CPF",
+          number: cpf || "12345678909",
         },
-      ],
-      purpose: "wallet_purchase",
-      payment_methods: {
-        excluded_payment_types: [
-          { id: "credit_card" },
-          { id: "debit_card" },
-          { id: "ticket" },
-          { id: "atm" },
-          { id: "bank_transfer" },
-        ],
       },
-      back_urls: {
-        success: "https://curriculospara.vercel.app/success",
-        pending: "https://curriculospara.vercel.app/pending",
-        failure: "https://curriculospara.vercel.app/failure",
-      },
-      auto_return: "approved",
       notification_url: `${MP_NOTIFICATION_URL}/webhook`,
     };
 
-    console.log("📡 [criar-preferencia] Enviando requisição para Mercado Pago");
-    const response = await axios.post(
-      "https://api.mercadopago.com/checkout/preferences",
-      preference,
-      {
-        headers: {
-          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    console.log("🚀 Enviando pagamento ao Mercado Pago:", body);
 
-    const preferenceId = response.data.id;
-    if (!preferenceId) {
-      console.error("❌ [criar-preferencia] Resposta sem preferenceId:", response.data);
-      return res.status(500).json({ erro: "Resposta inválida do Mercado Pago: preferenceId ausente" });
+    const result = await payment.create({ body });
+    const { id, point_of_interaction } = result;
+
+    if (!point_of_interaction?.transaction_data?.qr_code) {
+      console.error("❌ QR Code não encontrado na resposta:", result);
+      return res.status(500).json({ erro: "QR Code não retornado" });
     }
 
-    console.log("✅ [criar-preferencia] Preferência criada:", preferenceId);
-    res.json({ preferenceId });
-  } catch (err) {
-    console.error("❌ [criar-preferencia] Erro:", {
-      message: err.message,
-      status: err.response?.status,
-      data: err.response?.data,
+    console.log("✅ Pagamento criado com sucesso:", id);
+    res.json({
+      id,
+      qr_code: point_of_interaction.transaction_data.qr_code,
+      qr_code_base64: point_of_interaction.transaction_data.qr_code_base64,
     });
-    res.status(500).json({ erro: "Erro ao criar preferência: " + (err.message || "Desconhecido") });
+  } catch (err) {
+    console.error("❌ Erro ao criar pagamento:", err.message, err.cause || err);
+    res.status(500).json({ erro: "Erro ao criar pagamento" });
   }
 });
 
-// WEBHOOK PARA NOTIFICAÇÕES DE PAGAMENTO
+// WEBHOOK PARA RECEBER NOTIFICAÇÕES DO MERCADO PAGO
 app.post("/webhook", (req, res) => {
   try {
-    console.log("📬 [webhook] Recebido:", req.body);
     const log = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
     fs.appendFileSync("webhook.log", log);
+    console.log("📬 Webhook recebido:", req.body);
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ [webhook] Erro:", err.message);
+    console.error("❌ Erro ao processar webhook:", err.message);
     res.sendStatus(500);
   }
 });
 
-// CONSULTA DE STATUS DE PAGAMENTO POR ID
+// CONSULTA DE STATUS DE PAGAMENTO
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
-  if (!id) {
-    console.error("❌ [check-payment] ID não informado");
-    return res.status(400).json({ erro: "id do pagamento não informado" });
-  }
+  if (!id) return res.status(400).json({ erro: "id do pagamento não informado" });
 
   try {
-    console.log(`🔍 [check-payment] Verificando pagamento ID: ${id}`);
-    const response = await axios.get(
-      `https://api.mercadopago.com/v1/payments/${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-        },
-      }
-    );
-
-    const pago = response.data.status === "approved";
-    console.log(`✅ [check-payment] Status: ${pago ? "APROVADO" : response.data.status}`);
+    const result = await payment.get({ id });
+    const pago = result.status === "approved";
+    console.log(`🔍 Status pagamento [${id}]: ${result.status}`);
     res.json({ paid: pago });
   } catch (err) {
-    console.error("❌ [check-payment] Erro:", {
-      message: err.message,
-      status: err.response?.status,
-      data: err.response?.data,
-    });
-    res.status(500).json({ erro: "Erro ao verificar pagamento: " + (err.message || "Desconhecido") });
+    console.error("❌ Erro ao verificar status:", err.message, err.cause || err);
+    res.status(500).json({ erro: "Erro ao verificar status do pagamento" });
   }
 });
 
 // ROTA FALLBACK
 app.use((req, res) => {
-  console.log("⚠️ [fallback] Rota não encontrada:", req.url);
-  res.status(404).json({ error: "Rota não encontrada" });
+  res.status(404).json({ erro: "Rota não encontrada" });
 });
 
 // INICIAR SERVIDOR
 app.listen(PORT, () => {
-  console.log(`✅ API Mercado Pago rodando na porta ${PORT}`);
+  console.log(`✅ API rodando em http://localhost:${PORT}`);
 });
