@@ -22,7 +22,7 @@ if (!MP_ACCESS_TOKEN || !MP_NOTIFICATION_URL) {
 console.log("===========================");
 console.log("✅ Inicializando API Mercado Pago");
 console.log("🔐 MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
-console.log("🔐 MP_WEBHOOK_SECRET:", MP_WEBHOOK_SECRET);
+console.log("🔐 MP_WEBHOOK_SECRET:", MP_WEBHOOK_SECRET ? "Definido" : "Não definido");
 console.log("===========================");
 
 // LOG DE TODAS AS REQUISIÇÕES RECEBIDAS
@@ -34,13 +34,14 @@ app.use((req, res, next) => {
 // CRIAÇÃO DE PREFERÊNCIA PARA USO NO PAYMENT BRICK
 app.post("/criar-preferencia", async (req, res) => {
   try {
+    console.log("🚀 [criar-preferencia] Iniciando criação de preferência");
     const preference = {
       items: [
         {
           title: "Pagamento Currículo",
-          unit_price: 1.0,
-          quantity: 1
-        }
+          unit_price: 2.0, // Ajustado para R$2,00 para evitar erro de valor mínimo
+          quantity: 1,
+        },
       ],
       purpose: "wallet_purchase",
       payment_methods: {
@@ -49,46 +50,57 @@ app.post("/criar-preferencia", async (req, res) => {
           { id: "debit_card" },
           { id: "ticket" },
           { id: "atm" },
-          { id: "bank_transfer" }
-        ]
+          { id: "bank_transfer" },
+        ],
       },
       back_urls: {
         success: "https://curriculospara.vercel.app/success",
         pending: "https://curriculospara.vercel.app/pending",
-        failure: "https://curriculospara.vercel.app/failure"
+        failure: "https://curriculospara.vercel.app/failure",
       },
       auto_return: "approved",
-      notification_url: `${MP_NOTIFICATION_URL}/webhook`
+      notification_url: `${MP_NOTIFICATION_URL}/webhook`,
     };
 
+    console.log("📡 [criar-preferencia] Enviando requisição para Mercado Pago");
     const response = await axios.post(
       "https://api.mercadopago.com/checkout/preferences",
       preference,
       {
         headers: {
           Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
 
-    console.log("✅ Preferência criada:", response.data.id);
-    res.json({ preferenceId: response.data.id });
+    const preferenceId = response.data.id;
+    if (!preferenceId) {
+      console.error("❌ [criar-preferencia] Resposta sem preferenceId:", response.data);
+      return res.status(500).json({ erro: "Resposta inválida do Mercado Pago: preferenceId ausente" });
+    }
+
+    console.log("✅ [criar-preferencia] Preferência criada:", preferenceId);
+    res.json({ preferenceId });
   } catch (err) {
-    console.error("❌ Erro ao criar preferência:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao criar preferência" });
+    console.error("❌ [criar-preferencia] Erro:", {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+    });
+    res.status(500).json({ erro: "Erro ao criar preferência: " + (err.message || "Desconhecido") });
   }
 });
 
 // WEBHOOK PARA NOTIFICAÇÕES DE PAGAMENTO
 app.post("/webhook", (req, res) => {
   try {
+    console.log("📬 [webhook] Recebido:", req.body);
     const log = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
     fs.appendFileSync("webhook.log", log);
-    console.log("📬 Webhook recebido:", req.body);
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ Erro ao registrar webhook:", err.message);
+    console.error("❌ [webhook] Erro:", err.message);
     res.sendStatus(500);
   }
 });
@@ -96,29 +108,38 @@ app.post("/webhook", (req, res) => {
 // CONSULTA DE STATUS DE PAGAMENTO POR ID
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
-  if (!id) return res.status(400).json({ erro: "id do pagamento não informado" });
+  if (!id) {
+    console.error("❌ [check-payment] ID não informado");
+    return res.status(400).json({ erro: "id do pagamento não informado" });
+  }
 
   try {
+    console.log(`🔍 [check-payment] Verificando pagamento ID: ${id}`);
     const response = await axios.get(
       `https://api.mercadopago.com/v1/payments/${id}`,
       {
         headers: {
-          Authorization: `Bearer ${MP_ACCESS_TOKEN}`
-        }
+          Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+        },
       }
     );
 
     const pago = response.data.status === "approved";
-    console.log(`🔍 Pagamento [${id}] status: ${pago ? "APROVADO" : response.data.status}`);
+    console.log(`✅ [check-payment] Status: ${pago ? "APROVADO" : response.data.status}`);
     res.json({ paid: pago });
   } catch (err) {
-    console.error("❌ Erro ao verificar pagamento:", err.response?.data || err.message);
-    res.status(500).json({ erro: "Erro ao verificar pagamento" });
+    console.error("❌ [check-payment] Erro:", {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+    });
+    res.status(500).json({ erro: "Erro ao verificar pagamento: " + (err.message || "Desconhecido") });
   }
 });
 
 // ROTA FALLBACK
 app.use((req, res) => {
+  console.log("⚠️ [fallback] Rota não encontrada:", req.url);
   res.status(404).json({ error: "Rota não encontrada" });
 });
 
