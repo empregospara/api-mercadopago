@@ -4,21 +4,27 @@ const puppeteer = require("puppeteer");
 
 async function generatePDF() {
   try {
-    // A URL de preview deve estar definida no .env como PREVIEW_URL.
     const previewUrl = process.env.PREVIEW_URL || "https://curriculospara.vercel.app/preview";
     console.log("Gerando PDF para a URL:", previewUrl);
 
-    // Lança o navegador headless com argumentos para ambientes de produção.
+    // Se o ambiente precisar de um caminho customizado para o Chrome, você pode configurá-lo:
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+    if (executablePath) {
+      console.log("Usando Chrome/Chromium em:", executablePath);
+    } else {
+      console.log("Usando o Chromium embutido no pacote puppeteer");
+    }
+
+    // Lança o navegador headless
     const browser = await puppeteer.launch({
+      executablePath, // Pode ser undefined se não estiver configurado, então usará o padrão do puppeteer
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     const page = await browser.newPage();
 
-    // Acessa a URL de preview e aguarda que a rede esteja ociosa (útil para páginas complexas).
     await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 60000 });
-    console.log("Página carregada com sucesso, iniciando geração do PDF...");
+    console.log("Página carregada, iniciando geração do PDF...");
 
-    // Configura as opções do PDF: formato A4, background ativado e margens personalizadas.
     const pdfOptions = {
       format: "A4",
       printBackground: true,
@@ -30,7 +36,6 @@ async function generatePDF() {
       },
     };
 
-    // Gera o PDF e armazena o buffer.
     const pdfBuffer = await page.pdf(pdfOptions);
     console.log("PDF gerado com sucesso!");
 
