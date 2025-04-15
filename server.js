@@ -5,7 +5,7 @@ const cors = require("cors");
 const fs = require("fs");
 
 const app = express();
-app.use(cors({ origin: "https://curriculospara.vercel.app" }));
+app.use(cors());
 app.use(express.json());
 
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
@@ -18,20 +18,20 @@ if (!MP_ACCESS_TOKEN || !MP_NOTIFICATION_URL) {
   process.exit(1);
 }
 
-// LOG GLOBAL
+// LOG GERAL DE INICIALIZAÇÃO
 console.log("===========================");
 console.log("✅ Inicializando API Mercado Pago");
 console.log("🔐 MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
 console.log("🔐 MP_WEBHOOK_SECRET:", MP_WEBHOOK_SECRET);
 console.log("===========================");
 
-// LOG DE TODAS AS REQUISIÇÕES
+// LOG DE TODAS AS REQUISIÇÕES RECEBIDAS
 app.use((req, res, next) => {
   console.log(`📥 Requisição recebida: [${req.method}] ${req.url}`);
   next();
 });
 
-// CRIAR PREFERÊNCIA
+// CRIAÇÃO DE PREFERÊNCIA PARA USO NO PAYMENT BRICK
 app.post("/criar-preferencia", async (req, res) => {
   try {
     const preference = {
@@ -39,7 +39,7 @@ app.post("/criar-preferencia", async (req, res) => {
         {
           title: "Pagamento Currículo",
           unit_price: 1.0,
-          quantity: 1,
+          quantity: 1
         }
       ],
       purpose: "wallet_purchase",
@@ -80,7 +80,7 @@ app.post("/criar-preferencia", async (req, res) => {
   }
 });
 
-// WEBHOOK
+// WEBHOOK PARA NOTIFICAÇÕES DE PAGAMENTO
 app.post("/webhook", (req, res) => {
   try {
     const log = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
@@ -88,12 +88,12 @@ app.post("/webhook", (req, res) => {
     console.log("📬 Webhook recebido:", req.body);
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ Erro no webhook:", err.message);
+    console.error("❌ Erro ao registrar webhook:", err.message);
     res.sendStatus(500);
   }
 });
 
-// CHECK STATUS
+// CONSULTA DE STATUS DE PAGAMENTO POR ID
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ erro: "id do pagamento não informado" });
@@ -102,12 +102,14 @@ app.post("/check-payment", async (req, res) => {
     const response = await axios.get(
       `https://api.mercadopago.com/v1/payments/${id}`,
       {
-        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` }
+        headers: {
+          Authorization: `Bearer ${MP_ACCESS_TOKEN}`
+        }
       }
     );
 
     const pago = response.data.status === "approved";
-    console.log(`🔍 Verificação de pagamento [${id}]: ${pago ? "APROVADO" : response.data.status}`);
+    console.log(`🔍 Pagamento [${id}] status: ${pago ? "APROVADO" : response.data.status}`);
     res.json({ paid: pago });
   } catch (err) {
     console.error("❌ Erro ao verificar pagamento:", err.response?.data || err.message);
@@ -115,7 +117,7 @@ app.post("/check-payment", async (req, res) => {
   }
 });
 
-// 404
+// ROTA FALLBACK
 app.use((req, res) => {
   res.status(404).json({ error: "Rota não encontrada" });
 });
