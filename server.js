@@ -20,39 +20,53 @@ if (!MP_ACCESS_TOKEN || !MP_NOTIFICATION_URL) {
 const mpClient = new MercadoPagoConfig({ accessToken: MP_ACCESS_TOKEN });
 const payment = new Payment(mpClient);
 
-// LOG DE INICIALIZAÇÃO
+// INICIALIZAÇÃO
 console.log("===========================");
 console.log("✅ Inicializando API Mercado Pago com Payment Brick");
 console.log("🔐 MP_NOTIFICATION_URL:", MP_NOTIFICATION_URL);
 console.log("===========================");
 
-// LOG GLOBAL DE TODAS AS REQUISIÇÕES
+// LOG GLOBAL
 app.use((req, res, next) => {
   console.log(`📥 [${req.method}] ${req.url}`);
   next();
 });
 
-// ROTA DO FRONTEND PARA ENVIAR DADOS DO BRICK (onSubmit)
+// PROCESSAMENTO DO PAGAMENTO (PIX) — usável via /process_payment
 app.post("/process_payment", async (req, res) => {
   try {
+    const { email, firstName, lastName, cpf } = req.body.payer || {};
     const body = {
-      ...req.body,
+      transaction_amount: 2.0,
+      description: "Pagamento de Currículo",
+      payment_method_id: "pix",
+      payer: {
+        email: email || "teste@exemplo.com",
+        first_name: firstName || "Usuário",
+        last_name: lastName || "Empregos",
+        identification: {
+          type: "CPF",
+          number: cpf || "12345678909",
+        },
+      },
       notification_url: `${MP_NOTIFICATION_URL}/webhook`,
     };
 
-    console.log("🚀 [process_payment] Criando pagamento:", body);
-
+    console.log("🚀 Enviando pagamento:", body);
     const result = await payment.create({ body });
 
-    if (!result.id) {
-      console.error("❌ [process_payment] ID de pagamento ausente na resposta:", result);
-      return res.status(500).json({ erro: "Falha ao processar pagamento" });
+    const { id, status, point_of_interaction } = result;
+    const { qr_code, qr_code_base64 } = point_of_interaction?.transaction_data || {};
+
+    if (!qr_code) {
+      console.error("❌ QR Code ausente:", result);
+      return res.status(500).json({ erro: "QR Code não retornado" });
     }
 
-    console.log("✅ [process_payment] Pagamento criado:", result.id);
-    res.status(200).json({ id: result.id });
+    console.log("✅ Pagamento criado:", id);
+    res.json({ id, status, qr_code, qr_code_base64 });
   } catch (err) {
-    console.error("❌ [process_payment] Erro:", err.message, err.cause || err);
+    console.error("❌ Erro no pagamento:", err.message, err.cause || err);
     res.status(500).json({ erro: "Erro ao processar pagamento" });
   }
 });
@@ -62,26 +76,26 @@ app.post("/webhook", (req, res) => {
   try {
     const log = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
     fs.appendFileSync("webhook.log", log);
-    console.log("📬 [webhook] Recebido:", req.body);
+    console.log("📬 Webhook recebido:", req.body);
     res.sendStatus(200);
   } catch (err) {
-    console.error("❌ [webhook] Erro:", err.message);
+    console.error("❌ Erro no webhook:", err.message);
     res.sendStatus(500);
   }
 });
 
-// CONSULTA DE STATUS DE PAGAMENTO
+// CONSULTA DE STATUS
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
-  if (!id) return res.status(400).json({ erro: "id do pagamento não informado" });
+  if (!id) return res.status(400).json({ erro: "ID do pagamento ausente" });
 
   try {
     const result = await payment.get({ id });
     const pago = result.status === "approved";
-    console.log(`🔍 [check-payment] Pagamento ${id} -> ${result.status}`);
+    console.log(`🔍 Pagamento ${id}: ${result.status}`);
     res.json({ paid: pago });
   } catch (err) {
-    console.error("❌ [check-payment] Erro:", err.message, err.cause || err);
+    console.error("❌ Erro ao checar status:", err.message, err.cause || err);
     res.status(500).json({ erro: "Erro ao verificar status do pagamento" });
   }
 });
@@ -91,7 +105,7 @@ app.use((req, res) => {
   res.status(404).json({ erro: "Rota não encontrada" });
 });
 
-// INICIAR SERVIDOR
+// INÍCIO
 app.listen(PORT, () => {
   console.log(`✅ API rodando em http://localhost:${PORT}`);
 });
