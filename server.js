@@ -27,19 +27,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Criar dados de pagamento para Payment Brick (Checkout Transparente)
+// Endpoint que retorna o valor e o email para o Payment Brick
 app.post("/criar-preferencia", (req, res) => {
   try {
-    const amount = 3.00; // valor fixo
-    const email = "daniel_geovani@live.com"; // fixo por enquanto
+    const amount = 3.00;
+    const { email } = req.body;
 
-    // Verificações obrigatórias
     if (!email || typeof email !== "string" || !email.includes("@")) {
-      return res.status(400).json({ erro: "Email inválido para geração do pagamento" });
-    }
-
-    if (!amount || typeof amount !== "number" || amount < 1) {
-      return res.status(400).json({ erro: "Valor inválido do pagamento" });
+      return res.status(400).json({ erro: "E-mail inválido para geração do pagamento" });
     }
 
     res.json({ amount, email });
