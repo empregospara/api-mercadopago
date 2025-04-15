@@ -27,24 +27,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Endpoint que retorna o valor e o email para o Payment Brick
+// ✅ Endpoint para informar o valor fixo do pagamento ao Brick
 app.post("/criar-preferencia", (req, res) => {
   try {
     const amount = 3.00;
-    const { email } = req.body;
-
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      return res.status(400).json({ erro: "E-mail inválido para geração do pagamento" });
-    }
-
-    res.json({ amount, email });
+    res.json({ amount });
   } catch (err) {
     console.error("❌ Erro ao retornar dados para o Payment Brick:", err.message);
     res.status(500).json({ erro: "Erro ao gerar dados de pagamento" });
   }
 });
 
-// Webhook
+// Webhook (a ser usado depois para automação)
 app.post("/webhook", (req, res) => {
   try {
     const log = `[${new Date().toISOString()}] ${JSON.stringify(req.body)}\n`;
@@ -57,7 +51,7 @@ app.post("/webhook", (req, res) => {
   }
 });
 
-// Verificar status do pagamento
+// Verificação de status de pagamento
 app.post("/check-payment", async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ erro: "id do pagamento não informado" });
@@ -76,7 +70,7 @@ app.post("/check-payment", async (req, res) => {
   }
 });
 
-// Fallback
+// Rota fallback
 app.use((req, res) => {
   res.status(404).json({ error: "Rota não encontrada" });
 });
