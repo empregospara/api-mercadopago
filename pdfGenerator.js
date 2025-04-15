@@ -3,35 +3,43 @@ require("dotenv").config();
 const puppeteer = require("puppeteer");
 
 async function generatePDF() {
-  // Define a URL de preview do currículo; ajuste conforme sua necessidade.
-  const previewUrl = process.env.PREVIEW_URL || "https://curriculospara.vercel.app/preview";
+  try {
+    // A URL de preview deve estar definida no .env como PREVIEW_URL.
+    const previewUrl = process.env.PREVIEW_URL || "https://curriculospara.vercel.app/preview";
+    console.log("Gerando PDF para a URL:", previewUrl);
 
-  // Inicia o navegador headless com configurações para ambientes de produção.
-  const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-  const page = await browser.newPage();
+    // Lança o navegador headless com argumentos para ambientes de produção.
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
 
-  // Navega até a página de preview e aguarda o carregamento completo (networkidle0)
-  await page.goto(previewUrl, { waitUntil: "networkidle0" });
+    // Acessa a URL de preview e aguarda que a rede esteja ociosa (útil para páginas complexas).
+    await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 60000 });
+    console.log("Página carregada com sucesso, iniciando geração do PDF...");
 
-  // Define as opções do PDF. Ajuste margens e formato conforme necessário.
-  const pdfOptions = {
-    format: "A4",
-    printBackground: true,
-    margin: {
-      top: "20mm",
-      right: "10mm",
-      bottom: "20mm",
-      left: "10mm",
-    },
-  };
+    // Configura as opções do PDF: formato A4, background ativado e margens personalizadas.
+    const pdfOptions = {
+      format: "A4",
+      printBackground: true,
+      margin: {
+        top: "20mm",
+        right: "10mm",
+        bottom: "20mm",
+        left: "10mm",
+      },
+    };
 
-  // Gera o PDF como buffer
-  const pdfBuffer = await page.pdf(pdfOptions);
+    // Gera o PDF e armazena o buffer.
+    const pdfBuffer = await page.pdf(pdfOptions);
+    console.log("PDF gerado com sucesso!");
 
-  await browser.close();
-  return pdfBuffer;
+    await browser.close();
+    return pdfBuffer;
+  } catch (error) {
+    console.error("Erro na função generatePDF:", error);
+    throw new Error("Falha ao gerar o PDF");
+  }
 }
 
 module.exports = generatePDF;
