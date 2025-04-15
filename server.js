@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 });
 
 // PROCESSAMENTO DO PAGAMENTO (PIX) — usável via /process_payment
-app.post("/process_payment", async (req, res) => {
+app.post("/criar-pagamento", async (req, res) => {
   try {
     const { email, firstName, lastName, cpf } = req.body.payer || {};
     const body = {
